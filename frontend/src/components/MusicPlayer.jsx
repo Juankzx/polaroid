@@ -9,9 +9,11 @@ export default function MusicPlayer({ settings }) {
   // Audio por defecto
   let songUrl = "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3"; 
 
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
   // Si se subió un MP3 personalizado, usamos ese
   if (settings?.custom_audio_path) {
-    songUrl = `http://localhost/babu/backend/public/storage/${settings.custom_audio_path}`;
+    songUrl = `${API_URL}/storage/${settings.custom_audio_path}`;
   }
 
   useEffect(() => {
