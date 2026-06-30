@@ -97,26 +97,50 @@ class MemoryForm
                                         $lat = self::getGps($gps['GPSLatitude'], $gps['GPSLatitudeRef']);
                                         $lng = self::getGps($gps['GPSLongitude'], $gps['GPSLongitudeRef']);
 
-                                        // Geocoding inverso
-                                        $response = Http::timeout(4)->withHeaders([
-                                            'User-Agent' => 'NuestraHistoriaApp/1.0'
-                                        ])->get("https://nominatim.openstreetmap.org/reverse", [
-                                            'lat' => $lat,
-                                            'lon' => $lng,
-                                            'format' => 'json',
-                                        ]);
+                                        // Geocoding inverso — Nominatim primero, BigDataCloud como fallback
+                                        $locationFound = null;
 
-                                        if ($response->successful()) {
-                                            $data = $response->json();
-                                            $address = $data['address'] ?? [];
-                                            $city = $address['city'] ?? $address['town'] ?? $address['village'] ?? $address['county'] ?? '';
-                                            $country = $address['country'] ?? '';
-                                            
-                                            $location = array_filter([$city, $country]);
-                                            if (!empty($location)) {
-                                                $set('location', implode(', ', $location));
-                                                \Illuminate\Support\Facades\Log::info("Location set from GPS: " . implode(', ', $location));
+                                        // Intento 1: Nominatim (OpenStreetMap)
+                                        try {
+                                            $response = Http::timeout(8)->withHeaders([
+                                                'User-Agent' => 'PolaroidMemories/2.0 (contact@example.com)',
+                                                'Accept-Language' => 'es',
+                                            ])->get("https://nominatim.openstreetmap.org/reverse", [
+                                                'lat' => $lat, 'lon' => $lng, 'format' => 'json',
+                                            ]);
+                                            if ($response->successful()) {
+                                                $addr = $response->json()['address'] ?? [];
+                                                $city    = $addr['city'] ?? $addr['town'] ?? $addr['village'] ?? $addr['municipality'] ?? $addr['county'] ?? '';
+                                                $country = $addr['country'] ?? '';
+                                                $parts   = array_filter([$city, $country]);
+                                                if (!empty($parts)) $locationFound = implode(', ', $parts);
                                             }
+                                        } catch (\Throwable $e) {
+                                            \Illuminate\Support\Facades\Log::warning("[Nominatim] " . $e->getMessage());
+                                        }
+
+                                        // Intento 2: BigDataCloud (sin API key, más tolerante con servidores cloud)
+                                        if (!$locationFound) {
+                                            try {
+                                                $response2 = Http::timeout(8)->get(
+                                                    "https://api.bigdatacloud.net/data/reverse-geocode-client",
+                                                    ['latitude' => $lat, 'longitude' => $lng, 'localityLanguage' => 'es']
+                                                );
+                                                if ($response2->successful()) {
+                                                    $json2   = $response2->json();
+                                                    $city    = $json2['city'] ?? $json2['locality'] ?? $json2['principalSubdivision'] ?? '';
+                                                    $country = $json2['countryName'] ?? '';
+                                                    $parts   = array_filter([$city, $country]);
+                                                    if (!empty($parts)) $locationFound = implode(', ', $parts);
+                                                }
+                                            } catch (\Throwable $e) {
+                                                \Illuminate\Support\Facades\Log::warning("[BigDataCloud] " . $e->getMessage());
+                                            }
+                                        }
+
+                                        if ($locationFound) {
+                                            $set('location', $locationFound);
+                                            \Illuminate\Support\Facades\Log::info("Location set from GPS: " . $locationFound);
                                         }
                                     }
                                 }
