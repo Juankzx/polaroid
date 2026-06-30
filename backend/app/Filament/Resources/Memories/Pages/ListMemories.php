@@ -107,7 +107,10 @@ class ListMemories extends ListRecords
                                 $timestamp = time();
                                 $signature = sha1("timestamp={$timestamp}" . $apiSecret);
                                 $responseCloud = \Illuminate\Support\Facades\Http::attach('file', file_get_contents($fullPath), basename($fullPath))->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", ['api_key' => $apiKey, 'timestamp' => $timestamp, 'signature' => $signature]);
-                                if ($responseCloud->successful()) $cloudinaryUrl = $responseCloud->json()['secure_url'];
+                                if ($responseCloud->successful()) {
+                                    $resData = $responseCloud->json();
+                                    $cloudinaryUrl = $resData['public_id'] . '.' . $resData['format'];
+                                }
                             }
                         }
 
@@ -250,7 +253,8 @@ class ListMemories extends ListRecords
                                 ]);
 
                                 if ($responseCloud->successful()) {
-                                    $cloudinaryUrl = $responseCloud->json()['secure_url'];
+                                    $resData = $responseCloud->json();
+                                    $cloudinaryUrl = $resData['public_id'] . '.' . $resData['format'];
                                 } else {
                                     \Illuminate\Support\Facades\Log::error("Cloudinary Error: " . $responseCloud->body());
                                 }

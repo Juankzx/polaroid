@@ -24,7 +24,18 @@ class MemoriesTable
                     ->badge()
                     ->searchable(),
                 ImageColumn::make('image_path')
-                    ->label('Foto'),
+                    ->label('Foto')
+                    ->getStateUsing(function ($record) {
+                        if (!$record->image_path) return null;
+                        if (str_starts_with($record->image_path, 'http')) {
+                            return $record->image_path;
+                        }
+                        try {
+                            return \Illuminate\Support\Facades\Storage::disk('cloudinary')->url($record->image_path);
+                        } catch (\Exception $e) {
+                            return asset('storage/' . $record->image_path);
+                        }
+                    }),
                 TextColumn::make('date')
                     ->label('Fecha')
                     ->date()
