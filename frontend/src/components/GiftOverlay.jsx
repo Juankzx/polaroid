@@ -335,7 +335,7 @@ export default function GiftOverlay({ settings, onOpen }) {
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.5, duration: 1.2, ease: "easeOut" }}
-              className="text-center z-10 mb-24 md:mb-32"
+              className="text-center z-10 mb-48 md:mb-56"
           >
               <motion.div
                 className="text-5xl mb-4"
@@ -367,7 +367,7 @@ export default function GiftOverlay({ settings, onOpen }) {
 
           {/* Contenedor de la caja */}
           <motion.div 
-              className="relative cursor-pointer group flex flex-col items-center z-20 mt-12 md:mt-16" 
+              className="relative cursor-pointer group flex flex-col items-center z-20 mt-20 md:mt-28" 
               onClick={handleOpenGift}
               whileHover={!isOpening ? { scale: 1.06 } : {}}
               animate={!isOpening ? { y: [0, -8, 0] } : {}}
