@@ -38,7 +38,7 @@ export default function Polaroid({ memory }) {
           <div className="polaroid-image-wrapper">
             {memory.image_path ? (
               <img 
-                src={memory.image_path.startsWith('http') ? memory.image_path : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/storage/${memory.image_path}`} 
+                src={memory.image_url || (memory.image_path.startsWith('http') ? memory.image_path : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/storage/${memory.image_path}`)} 
                 alt={memory.title} 
               />
             ) : (

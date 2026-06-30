@@ -7,7 +7,18 @@ use App\Models\Memory;
 Route::middleware(['throttle:60,1'])->group(function () {
     Route::get('/memories', function () {
         // Retorna las memorias ordenadas por fecha para la línea de tiempo
-        return Memory::orderBy('date', 'asc')->get();
+        $memories = Memory::orderBy('date', 'asc')->get();
+        return $memories->map(function ($memory) {
+            $data = $memory->toArray();
+            if ($memory->image_path) {
+                try {
+                    $data['image_url'] = \Illuminate\Support\Facades\Storage::disk('cloudinary')->url($memory->image_path);
+                } catch (\Exception $e) {
+                    $data['image_url'] = asset('storage/' . $memory->image_path);
+                }
+            }
+            return $data;
+        });
     });
 
     Route::get('/settings', function () {

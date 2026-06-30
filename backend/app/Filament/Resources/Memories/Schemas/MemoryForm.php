@@ -36,8 +36,7 @@ class MemoryForm
                     ->columnSpanFull(),
                 FileUpload::make('image_path')
                     ->label('Sube tu Foto')
-                    ->disk('public')
-                    ->directory('memories')
+                    ->disk('cloudinary')
                     ->image()
                     ->live()
                     ->afterStateUpdated(function ($state, callable $set, \Filament\Forms\Components\FileUpload $component) {
