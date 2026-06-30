@@ -12,7 +12,10 @@ export default function MusicPlayer({ settings }) {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   // Si se subió un MP3 personalizado, usamos ese
-  if (settings?.custom_audio_path) {
+  if (settings?.custom_audio_url) {
+    songUrl = settings.custom_audio_url;
+  } else if (settings?.custom_audio_path) {
+    // Retrocompatibilidad por si falla la API
     songUrl = settings.custom_audio_path.startsWith('http') 
       ? settings.custom_audio_path 
       : `${API_URL}/storage/${settings.custom_audio_path}`;
