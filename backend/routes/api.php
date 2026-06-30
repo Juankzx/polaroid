@@ -11,10 +11,14 @@ Route::middleware(['throttle:60,1'])->group(function () {
         return $memories->map(function ($memory) {
             $data = $memory->toArray();
             if ($memory->image_path) {
-                try {
-                    $data['image_url'] = \Illuminate\Support\Facades\Storage::disk('cloudinary')->url($memory->image_path);
-                } catch (\Exception $e) {
-                    $data['image_url'] = asset('storage/' . $memory->image_path);
+                if (str_starts_with($memory->image_path, 'http')) {
+                    $data['image_url'] = $memory->image_path;
+                } else {
+                    try {
+                        $data['image_url'] = \Illuminate\Support\Facades\Storage::disk('cloudinary')->url($memory->image_path);
+                    } catch (\Exception $e) {
+                        $data['image_url'] = asset('storage/' . $memory->image_path);
+                    }
                 }
             }
             return $data;
@@ -29,11 +33,7 @@ Route::middleware(['throttle:60,1'])->group(function () {
             if (str_starts_with($settings->custom_audio_path, 'http')) {
                 $data['custom_audio_url'] = $settings->custom_audio_path;
             } else {
-                try {
-                    $data['custom_audio_url'] = \Illuminate\Support\Facades\Storage::disk('cloudinary')->url($settings->custom_audio_path);
-                } catch (\Exception $e) {
-                    $data['custom_audio_url'] = asset('storage/' . $settings->custom_audio_path);
-                }
+                $data['custom_audio_url'] = asset('storage/' . $settings->custom_audio_path);
             }
         }
         
