@@ -322,7 +322,7 @@ export default function GiftOverlay({ settings, onOpen }) {
       {phase === 'gift' && (
         <motion.div
           key="gift"
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden"
+          className="fixed inset-0 z-50 overflow-hidden"
           style={{ background: 'radial-gradient(ellipse at center, #1a0a2e 0%, #050510 70%)' }}
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 1.05 }}
@@ -335,7 +335,7 @@ export default function GiftOverlay({ settings, onOpen }) {
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.5, duration: 1.2, ease: "easeOut" }}
-              className="text-center z-10 mb-48 md:mb-56"
+              className="absolute top-[15%] md:top-[20%] left-0 w-full text-center z-10 px-4"
           >
               <motion.div
                 className="text-5xl mb-4"
@@ -367,7 +367,7 @@ export default function GiftOverlay({ settings, onOpen }) {
 
           {/* Contenedor de la caja */}
           <motion.div 
-              className="relative cursor-pointer group flex flex-col items-center z-20 mt-20 md:mt-28" 
+              className="absolute top-[55%] md:top-[60%] left-0 w-full cursor-pointer group flex flex-col items-center z-20" 
               onClick={handleOpenGift}
               whileHover={!isOpening ? { scale: 1.06 } : {}}
               animate={!isOpening ? { y: [0, -8, 0] } : {}}
