@@ -38,7 +38,7 @@ class MemoryForm
                     ->label('Sube tu Foto')
                     ->disk('cloudinary')
                     ->formatStateUsing(function ($state) {
-                        if ($state && str_starts_with($state, 'http')) {
+                        if ($state && is_string($state) && str_starts_with($state, 'http')) {
                             $parts = explode('/', parse_url($state, PHP_URL_PATH));
                             return end($parts);
                         }
