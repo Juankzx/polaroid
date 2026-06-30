@@ -24,6 +24,7 @@ class ListMemories extends ListRecords
                         ->image()
                         ->disk('public')
                         ->directory('temp_bulk')
+                        ->preserveFilenames()
                         ->required(),
                     \Filament\Forms\Components\TextInput::make('titulo_general')
                         ->label('Título General')
@@ -81,6 +82,18 @@ class ListMemories extends ListRecords
                                     }
                                 }
                             }
+                            // Fallback al nombre del archivo si no se extrajo fecha del EXIF
+                            if ($fecha === now()->format('Y-m-d')) {
+                                $filename = basename($fullPath);
+                                if (preg_match('/(\d{4})[-_]?(\d{2})[-_]?(\d{2})/', $filename, $matches)) {
+                                    $year  = (int) $matches[1];
+                                    $month = (int) $matches[2];
+                                    $day   = (int) $matches[3];
+                                    if ($year >= 2000 && $year <= 2030 && checkdate($month, $day, $year)) {
+                                        $fecha = sprintf('%04d-%02d-%02d', $year, $month, $day);
+                                    }
+                                }
+                            }
                         } catch (\Throwable $e) {}
 
                         $cloudinaryUrl = env('APP_URL');
@@ -127,6 +140,7 @@ class ListMemories extends ListRecords
                                 ->image()
                                 ->disk('public')
                                 ->directory('temp_bulk')
+                                ->preserveFilenames()
                                 ->required()
                                 ->columnSpanFull(),
                             \Filament\Forms\Components\TextInput::make('title')
@@ -194,6 +208,19 @@ class ListMemories extends ListRecords
                                             $locArr = array_filter([$city, $country]);
                                             if (!empty($locArr)) $ubicacion = implode(', ', $locArr);
                                         }
+                                    }
+                                }
+                            }
+                            
+                            // Fallback al nombre del archivo si no se extrajo fecha del EXIF
+                            if ($fecha === now()->format('Y-m-d')) {
+                                $filename = basename($fullPath);
+                                if (preg_match('/(\d{4})[-_]?(\d{2})[-_]?(\d{2})/', $filename, $matches)) {
+                                    $year  = (int) $matches[1];
+                                    $month = (int) $matches[2];
+                                    $day   = (int) $matches[3];
+                                    if ($year >= 2000 && $year <= 2030 && checkdate($month, $day, $year)) {
+                                        $fecha = sprintf('%04d-%02d-%02d', $year, $month, $day);
                                     }
                                 }
                             }
