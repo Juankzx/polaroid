@@ -15,5 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->reportable(function (\Throwable $e) {
+            @file_put_contents(storage_path('logs/debug.txt'), date('Y-m-d H:i:s') . " - " . $e->getMessage() . "\n" . $e->getFile() . ":" . $e->getLine() . "\n\n", FILE_APPEND);
+        });
     })->create();

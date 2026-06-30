@@ -53,11 +53,10 @@ Route::middleware(['throttle:60,1'])->group(function () {
     });
 
     Route::get('/debug-logs', function () {
-        $logPath = storage_path('logs/laravel.log');
+        $logPath = storage_path('logs/debug.txt');
         if (!file_exists($logPath)) {
             return 'No log file found.';
         }
-        // Devuelve los últimos 10000 caracteres para no saturar
         $logs = file_get_contents($logPath);
         return response(substr($logs, -10000))->header('Content-Type', 'text/plain');
     });
