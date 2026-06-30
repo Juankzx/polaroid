@@ -41,6 +41,14 @@ class ListMemories extends ListRecords
                         ])
                         ->default('Momentos Random 📸')
                         ->required(),
+                    \Filament\Forms\Components\DatePicker::make('fecha_fallback')
+                        ->label('Fecha General (fallback)')
+                        ->helperText('🕰️ Se extraerá automáticamente del EXIF de cada foto. Solo se usa si la foto no tiene fecha interna.')
+                        ->default(now()->format('Y-m-d')),
+                    \Filament\Forms\Components\TextInput::make('ubicacion_fallback')
+                        ->label('Ubicación General (fallback)')
+                        ->helperText('🌍 Se extraerá automáticamente del GPS de cada foto. Solo se usa si la foto no tiene coordenadas.')
+                        ->placeholder('Ej: Santa Cruz, Bolivia'),
                     \Filament\Forms\Components\Toggle::make('is_locked')
                         ->label('¿Bloquear todas con candado?')
                         ->reactive(),
@@ -54,47 +62,77 @@ class ListMemories extends ListRecords
                 ->action(function (array $data) {
                     $contador = 1;
                     foreach ($data['fotos'] as $tempPath) {
-                        $fullPath = storage_path('app/public/' . $tempPath);
-                        $fecha = now()->format('Y-m-d');
-                        $ubicacion = null;
+                        // Intentar múltiples paths posibles para el archivo temporal
+                        $possiblePaths = [
+                            storage_path('app/public/' . $tempPath),
+                            storage_path('app/livewire-tmp/' . basename($tempPath)),
+                            storage_path('app/' . $tempPath),
+                        ];
+
+                        $fullPath = null;
+                        foreach ($possiblePaths as $p) {
+                            if (file_exists($p)) {
+                                $fullPath = $p;
+                                break;
+                            }
+                        }
+
+                        // Usar el primer path aunque no exista (fallback)
+                        if (!$fullPath) {
+                            $fullPath = storage_path('app/public/' . $tempPath);
+                        }
+
+                        $fecha = isset($data['fecha_fallback']) && $data['fecha_fallback']
+                            ? $data['fecha_fallback']
+                            : now()->format('Y-m-d');
+                        $ubicacion = $data['ubicacion_fallback'] ?? null;
+                        $exifExtracted = false;
 
                         try {
-                            $exif = @exif_read_data($fullPath, 'EXIF', true);
-                            if ($exif !== false) {
-                                $dateStr = $exif['EXIF']['DateTimeOriginal'] ?? $exif['IFD0']['DateTime'] ?? null;
-                                if ($dateStr) {
-                                    $parsed = \DateTime::createFromFormat('Y:m:d H:i:s', $dateStr);
-                                    if ($parsed) $fecha = $parsed->format('Y-m-d');
+                            if (file_exists($fullPath)) {
+                                $exif = @exif_read_data($fullPath, 'EXIF', true);
+                                if ($exif !== false) {
+                                    $dateStr = $exif['EXIF']['DateTimeOriginal'] ?? $exif['IFD0']['DateTime'] ?? null;
+                                    if ($dateStr) {
+                                        $parsed = \DateTime::createFromFormat('Y:m:d H:i:s', $dateStr);
+                                        if ($parsed) {
+                                            $fecha = $parsed->format('Y-m-d');
+                                            $exifExtracted = true;
+                                        }
+                                    }
+                                    if (isset($exif['GPS'])) {
+                                        $gps = $exif['GPS'];
+                                        if (isset($gps['GPSLatitude'], $gps['GPSLongitude'], $gps['GPSLatitudeRef'], $gps['GPSLongitudeRef'])) {
+                                            $lat = \App\Filament\Resources\Memories\Schemas\MemoryForm::getGps($gps['GPSLatitude'], $gps['GPSLatitudeRef']);
+                                            $lng = \App\Filament\Resources\Memories\Schemas\MemoryForm::getGps($gps['GPSLongitude'], $gps['GPSLongitudeRef']);
+                                            $response = \Illuminate\Support\Facades\Http::timeout(4)->withHeaders(['User-Agent' => 'NuestraHistoriaApp/1.0'])->get("https://nominatim.openstreetmap.org/reverse", ['lat' => $lat, 'lon' => $lng, 'format' => 'json']);
+                                            if ($response->successful()) {
+                                                $address = $response->json()['address'] ?? [];
+                                                $city = $address['city'] ?? $address['town'] ?? $address['village'] ?? $address['county'] ?? '';
+                                                $country = $address['country'] ?? '';
+                                                $locArr = array_filter([$city, $country]);
+                                                if (!empty($locArr)) $ubicacion = implode(', ', $locArr);
+                                            }
+                                        }
+                                    }
                                 }
-                                if (isset($exif['GPS'])) {
-                                    $gps = $exif['GPS'];
-                                    if (isset($gps['GPSLatitude'], $gps['GPSLongitude'], $gps['GPSLatitudeRef'], $gps['GPSLongitudeRef'])) {
-                                        $lat = \App\Filament\Resources\Memories\Schemas\MemoryForm::getGps($gps['GPSLatitude'], $gps['GPSLatitudeRef']);
-                                        $lng = \App\Filament\Resources\Memories\Schemas\MemoryForm::getGps($gps['GPSLongitude'], $gps['GPSLongitudeRef']);
-                                        $response = \Illuminate\Support\Facades\Http::timeout(4)->withHeaders(['User-Agent' => 'NuestraHistoriaApp/1.0'])->get("https://nominatim.openstreetmap.org/reverse", ['lat' => $lat, 'lon' => $lng, 'format' => 'json']);
-                                        if ($response->successful()) {
-                                            $address = $response->json()['address'] ?? [];
-                                            $city = $address['city'] ?? $address['town'] ?? $address['village'] ?? $address['county'] ?? '';
-                                            $country = $address['country'] ?? '';
-                                            $locArr = array_filter([$city, $country]);
-                                            if (!empty($locArr)) $ubicacion = implode(', ', $locArr);
+
+                                // Fallback al nombre del archivo si no se extrajo fecha del EXIF
+                                if (!$exifExtracted) {
+                                    $filename = basename($fullPath);
+                                    if (preg_match('/(\d{4})[-_]?(\d{2})[-_]?(\d{2})/', $filename, $matches)) {
+                                        $year  = (int) $matches[1];
+                                        $month = (int) $matches[2];
+                                        $day   = (int) $matches[3];
+                                        if ($year >= 2000 && $year <= 2030 && checkdate($month, $day, $year)) {
+                                            $fecha = sprintf('%04d-%02d-%02d', $year, $month, $day);
                                         }
                                     }
                                 }
                             }
-                            // Fallback al nombre del archivo si no se extrajo fecha del EXIF
-                            if ($fecha === now()->format('Y-m-d')) {
-                                $filename = basename($fullPath);
-                                if (preg_match('/(\d{4})[-_]?(\d{2})[-_]?(\d{2})/', $filename, $matches)) {
-                                    $year  = (int) $matches[1];
-                                    $month = (int) $matches[2];
-                                    $day   = (int) $matches[3];
-                                    if ($year >= 2000 && $year <= 2030 && checkdate($month, $day, $year)) {
-                                        $fecha = sprintf('%04d-%02d-%02d', $year, $month, $day);
-                                    }
-                                }
-                            }
-                        } catch (\Throwable $e) {}
+                        } catch (\Throwable $e) {
+                            \Illuminate\Support\Facades\Log::error("EXIF Error QuickBulk: " . $e->getMessage());
+                        }
 
                         $cloudinaryUrl = env('APP_URL');
                         $cloudUrlConfig = env('CLOUDINARY_URL');
@@ -147,6 +185,78 @@ class ListMemories extends ListRecords
                                 ->directory('temp_bulk')
                                 ->preserveFilenames()
                                 ->required()
+                                ->live()
+                                ->afterStateUpdated(function ($state, callable $set, \Filament\Forms\Components\FileUpload $component) {
+                                    if (!$state) return;
+
+                                    $files = $component->getState();
+                                    $file = is_array($files) ? reset($files) : $files;
+
+                                    // Si es un string (path relativo), intentar extraer fecha del nombre
+                                    if (is_string($file) || is_string($state)) {
+                                        $filename = is_string($state) ? basename($state) : basename($file);
+                                        if (preg_match('/(\d{4})[-_]?(\d{2})[-_]?(\d{2})/', $filename, $matches)) {
+                                            $year  = (int) $matches[1];
+                                            $month = (int) $matches[2];
+                                            $day   = (int) $matches[3];
+                                            if ($year >= 2000 && $year <= 2030 && checkdate($month, $day, $year)) {
+                                                $set('date', sprintf('%04d-%02d-%02d', $year, $month, $day));
+                                            }
+                                        }
+                                        return;
+                                    }
+
+                                    try {
+                                        $path = method_exists($file, 'getRealPath') ? $file->getRealPath() : null;
+                                        $filename = method_exists($file, 'getClientOriginalName') ? $file->getClientOriginalName() : '';
+
+                                        if ($path && file_exists($path)) {
+                                            $exif = @exif_read_data($path, 'EXIF', true);
+                                            $exifExtracted = false;
+
+                                            if ($exif !== false) {
+                                                $dateStr = $exif['EXIF']['DateTimeOriginal'] ?? $exif['IFD0']['DateTime'] ?? null;
+                                                if ($dateStr) {
+                                                    $parsed = \DateTime::createFromFormat('Y:m:d H:i:s', $dateStr);
+                                                    if ($parsed) {
+                                                        $set('date', $parsed->format('Y-m-d'));
+                                                        $exifExtracted = true;
+                                                    }
+                                                }
+
+                                                if (isset($exif['GPS'])) {
+                                                    $gps = $exif['GPS'];
+                                                    if (isset($gps['GPSLatitude'], $gps['GPSLongitude'], $gps['GPSLatitudeRef'], $gps['GPSLongitudeRef'])) {
+                                                        $lat = \App\Filament\Resources\Memories\Schemas\MemoryForm::getGps($gps['GPSLatitude'], $gps['GPSLatitudeRef']);
+                                                        $lng = \App\Filament\Resources\Memories\Schemas\MemoryForm::getGps($gps['GPSLongitude'], $gps['GPSLongitudeRef']);
+
+                                                        $response = \Illuminate\Support\Facades\Http::timeout(4)->withHeaders(['User-Agent' => 'NuestraHistoriaApp/1.0'])->get("https://nominatim.openstreetmap.org/reverse", ['lat' => $lat, 'lon' => $lng, 'format' => 'json']);
+                                                        if ($response->successful()) {
+                                                            $address = $response->json()['address'] ?? [];
+                                                            $city = $address['city'] ?? $address['town'] ?? $address['village'] ?? $address['county'] ?? '';
+                                                            $country = $address['country'] ?? '';
+                                                            $locArr = array_filter([$city, $country]);
+                                                            if (!empty($locArr)) $set('location', implode(', ', $locArr));
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            if (!$exifExtracted && $filename) {
+                                                if (preg_match('/(\d{4})[-_]?(\d{2})[-_]?(\d{2})/', $filename, $matches)) {
+                                                    $year  = (int) $matches[1];
+                                                    $month = (int) $matches[2];
+                                                    $day   = (int) $matches[3];
+                                                    if ($year >= 2000 && $year <= 2030 && checkdate($month, $day, $year)) {
+                                                        $set('date', sprintf('%04d-%02d-%02d', $year, $month, $day));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } catch (\Throwable $e) {
+                                        \Illuminate\Support\Facades\Log::error("EXIF Repeater Error: " . $e->getMessage());
+                                    }
+                                })
                                 ->columnSpanFull(),
                             \Filament\Forms\Components\TextInput::make('title')
                                 ->label('Título')
@@ -162,6 +272,13 @@ class ListMemories extends ListRecords
                                 ])
                                 ->default('Momentos Random 📸')
                                 ->required(),
+                            \Filament\Forms\Components\DatePicker::make('date')
+                                ->label('Fecha 🕰️')
+                                ->helperText('Se extrae automáticamente del EXIF al subir la foto'),
+                            \Filament\Forms\Components\TextInput::make('location')
+                                ->label('Ubicación 🌍')
+                                ->helperText('Se extrae del GPS de la foto si está disponible')
+                                ->placeholder('Ej: Santa Cruz, Bolivia'),
                             \Filament\Forms\Components\Textarea::make('description')
                                 ->label('Descripción / Dedicatoria')
                                 ->columnSpanFull()
@@ -184,76 +301,87 @@ class ListMemories extends ListRecords
                 ->action(function (array $data) {
                     foreach ($data['recuerdos'] as $item) {
                         $tempPath = $item['foto'];
-                        $fullPath = storage_path('app/public/' . $tempPath);
-                        
-                        $fecha = now()->format('Y-m-d');
-                        $ubicacion = null;
 
-                        // Intentar extraer EXIF
-                        try {
-                            $exif = @exif_read_data($fullPath, 'EXIF', true);
-                            if ($exif !== false) {
-                                $dateStr = $exif['EXIF']['DateTimeOriginal'] ?? $exif['IFD0']['DateTime'] ?? null;
-                                if ($dateStr) {
-                                    $parsed = \DateTime::createFromFormat('Y:m:d H:i:s', $dateStr);
-                                    if ($parsed) $fecha = $parsed->format('Y-m-d');
-                                }
-                                
-                                if (isset($exif['GPS'])) {
-                                    $gps = $exif['GPS'];
-                                    if (isset($gps['GPSLatitude'], $gps['GPSLongitude'], $gps['GPSLatitudeRef'], $gps['GPSLongitudeRef'])) {
-                                        $lat = \App\Filament\Resources\Memories\Schemas\MemoryForm::getGps($gps['GPSLatitude'], $gps['GPSLatitudeRef']);
-                                        $lng = \App\Filament\Resources\Memories\Schemas\MemoryForm::getGps($gps['GPSLongitude'], $gps['GPSLongitudeRef']);
-                                        
-                                        $response = \Illuminate\Support\Facades\Http::timeout(4)->withHeaders(['User-Agent' => 'NuestraHistoriaApp/1.0'])->get("https://nominatim.openstreetmap.org/reverse", ['lat' => $lat, 'lon' => $lng, 'format' => 'json']);
-                                        if ($response->successful()) {
-                                            $address = $response->json()['address'] ?? [];
-                                            $city = $address['city'] ?? $address['town'] ?? $address['village'] ?? $address['county'] ?? '';
-                                            $country = $address['country'] ?? '';
-                                            $locArr = array_filter([$city, $country]);
-                                            if (!empty($locArr)) $ubicacion = implode(', ', $locArr);
+                        // Intentar múltiples paths posibles para el archivo temporal
+                        $possiblePaths = [
+                            storage_path('app/public/' . $tempPath),
+                            storage_path('app/livewire-tmp/' . basename($tempPath)),
+                            storage_path('app/' . $tempPath),
+                        ];
+
+                        $fullPath = null;
+                        foreach ($possiblePaths as $p) {
+                            if (file_exists($p)) {
+                                $fullPath = $p;
+                                break;
+                            }
+                        }
+
+                        if (!$fullPath) {
+                            $fullPath = storage_path('app/public/' . $tempPath);
+                        }
+
+                        // Usar la fecha y ubicación del item (ya extraídas via afterStateUpdated o ingresadas manualmente)
+                        $fecha = $item['date'] ?? now()->format('Y-m-d');
+                        $ubicacion = $item['location'] ?? null;
+
+                        // Si no se extrajo nada aún, intentar EXIF al momento del save como fallback
+                        if (empty($item['date']) && file_exists($fullPath)) {
+                            try {
+                                $exif = @exif_read_data($fullPath, 'EXIF', true);
+                                if ($exif !== false) {
+                                    $dateStr = $exif['EXIF']['DateTimeOriginal'] ?? $exif['IFD0']['DateTime'] ?? null;
+                                    if ($dateStr) {
+                                        $parsed = \DateTime::createFromFormat('Y:m:d H:i:s', $dateStr);
+                                        if ($parsed) $fecha = $parsed->format('Y-m-d');
+                                    }
+
+                                    if (!$ubicacion && isset($exif['GPS'])) {
+                                        $gps = $exif['GPS'];
+                                        if (isset($gps['GPSLatitude'], $gps['GPSLongitude'], $gps['GPSLatitudeRef'], $gps['GPSLongitudeRef'])) {
+                                            $lat = \App\Filament\Resources\Memories\Schemas\MemoryForm::getGps($gps['GPSLatitude'], $gps['GPSLatitudeRef']);
+                                            $lng = \App\Filament\Resources\Memories\Schemas\MemoryForm::getGps($gps['GPSLongitude'], $gps['GPSLongitudeRef']);
+                                            $response = \Illuminate\Support\Facades\Http::timeout(4)->withHeaders(['User-Agent' => 'NuestraHistoriaApp/1.0'])->get("https://nominatim.openstreetmap.org/reverse", ['lat' => $lat, 'lon' => $lng, 'format' => 'json']);
+                                            if ($response->successful()) {
+                                                $address = $response->json()['address'] ?? [];
+                                                $city = $address['city'] ?? $address['town'] ?? $address['village'] ?? $address['county'] ?? '';
+                                                $country = $address['country'] ?? '';
+                                                $locArr = array_filter([$city, $country]);
+                                                if (!empty($locArr)) $ubicacion = implode(', ', $locArr);
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            
-                            // Fallback al nombre del archivo si no se extrajo fecha del EXIF
-                            if ($fecha === now()->format('Y-m-d')) {
-                                $filename = basename($fullPath);
-                                if (preg_match('/(\d{4})[-_]?(\d{2})[-_]?(\d{2})/', $filename, $matches)) {
-                                    $year  = (int) $matches[1];
-                                    $month = (int) $matches[2];
-                                    $day   = (int) $matches[3];
-                                    if ($year >= 2000 && $year <= 2030 && checkdate($month, $day, $year)) {
-                                        $fecha = sprintf('%04d-%02d-%02d', $year, $month, $day);
+
+                                // Fallback al nombre del archivo
+                                if (!$fecha || $fecha === now()->format('Y-m-d')) {
+                                    $filename = basename($fullPath);
+                                    if (preg_match('/(\d{4})[-_]?(\d{2})[-_]?(\d{2})/', $filename, $matches)) {
+                                        $year  = (int) $matches[1];
+                                        $month = (int) $matches[2];
+                                        $day   = (int) $matches[3];
+                                        if ($year >= 2000 && $year <= 2030 && checkdate($month, $day, $year)) {
+                                            $fecha = sprintf('%04d-%02d-%02d', $year, $month, $day);
+                                        }
                                     }
                                 }
+                            } catch (\Throwable $e) {
+                                \Illuminate\Support\Facades\Log::error("EXIF Error DetailedBulk: " . $e->getMessage());
                             }
-                        } catch (\Throwable $e) {
-                            \Illuminate\Support\Facades\Log::error("EXIF Error Bulk: " . $e->getMessage());
                         }
 
-                        // Subir a Cloudinary nativamente (Signed Upload sin paquetes)
-                        $cloudinaryUrl = env('APP_URL'); // fallback
+                        // Subir a Cloudinary
+                        $cloudinaryUrl = env('APP_URL');
                         $cloudUrlConfig = env('CLOUDINARY_URL');
                         if ($cloudUrlConfig) {
                             $parsed = parse_url($cloudUrlConfig);
                             $apiKey = $parsed['user'] ?? '';
                             $apiSecret = $parsed['pass'] ?? '';
                             $cloudName = $parsed['host'] ?? '';
-
                             if ($apiKey && $apiSecret && $cloudName && $apiSecret !== 'PON_TU_API_SECRET_AQUI') {
                                 $timestamp = time();
                                 $signature = sha1("timestamp={$timestamp}" . $apiSecret);
-
-                                $responseCloud = \Illuminate\Support\Facades\Http::attach(
-                                    'file', file_get_contents($fullPath), basename($fullPath)
-                                )->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", [
-                                    'api_key' => $apiKey,
-                                    'timestamp' => $timestamp,
-                                    'signature' => $signature,
-                                ]);
-
+                                $responseCloud = \Illuminate\Support\Facades\Http::attach('file', file_get_contents($fullPath), basename($fullPath))->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", ['api_key' => $apiKey, 'timestamp' => $timestamp, 'signature' => $signature]);
                                 if ($responseCloud->successful()) {
                                     $resData = $responseCloud->json();
                                     $cloudinaryUrl = $resData['public_id'] . '.' . $resData['format'];
@@ -263,7 +391,6 @@ class ListMemories extends ListRecords
                             }
                         }
 
-                        // Crear el registro
                         \App\Models\Memory::create([
                             'title' => $item['title'],
                             'category' => $item['category'],
@@ -275,8 +402,6 @@ class ListMemories extends ListRecords
                             'unlock_question' => $data['unlock_question'] ?? null,
                             'unlock_answer' => $data['unlock_answer'] ?? null,
                         ]);
-
-                        // Eliminar archivo temporal local
                         @unlink($fullPath);
                     }
                 })
