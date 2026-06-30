@@ -13,7 +13,9 @@ export default function MusicPlayer({ settings }) {
 
   // Si se subió un MP3 personalizado, usamos ese
   if (settings?.custom_audio_path) {
-    songUrl = `${API_URL}/storage/${settings.custom_audio_path}`;
+    songUrl = settings.custom_audio_path.startsWith('http') 
+      ? settings.custom_audio_path 
+      : `${API_URL}/storage/${settings.custom_audio_path}`;
   }
 
   useEffect(() => {

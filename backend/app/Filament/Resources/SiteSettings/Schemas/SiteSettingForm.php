@@ -54,8 +54,7 @@ class SiteSettingForm
                         \Filament\Forms\Components\FileUpload::make('custom_audio_path')
                             ->label('Sube tu archivo de Música')
                             ->helperText('Sube un archivo MP3 o WAV (Máx. 10MB)')
-                            ->disk('public')
-                            ->directory('audio')
+                            ->disk('cloudinary')
                             ->acceptedFileTypes(['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-m4a'])
                             ->maxSize(10240) // 10 MB
                             ->columnSpanFull(),
