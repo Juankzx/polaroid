@@ -33,7 +33,11 @@ Route::middleware(['throttle:60,1'])->group(function () {
             if (str_starts_with($settings->custom_audio_path, 'http')) {
                 $data['custom_audio_url'] = $settings->custom_audio_path;
             } else {
-                $data['custom_audio_url'] = asset('storage/' . $settings->custom_audio_path);
+                try {
+                    $data['custom_audio_url'] = \Illuminate\Support\Facades\Storage::disk('cloudinary')->url($settings->custom_audio_path);
+                } catch (\Exception $e) {
+                    $data['custom_audio_url'] = asset('storage/' . $settings->custom_audio_path);
+                }
             }
         }
         
