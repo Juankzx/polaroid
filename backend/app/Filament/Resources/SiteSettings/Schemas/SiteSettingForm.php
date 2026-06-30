@@ -54,9 +54,15 @@ class SiteSettingForm
                         \Filament\Forms\Components\FileUpload::make('custom_audio_path')
                             ->label('Sube tu archivo de Música')
                             ->helperText('Sube un archivo MP3 o WAV (Máx. 10MB)')
-                            ->disk('cloudinary')
                             ->acceptedFileTypes(['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-m4a'])
                             ->maxSize(10240) // 10 MB
+                            ->saveUploadedFileUsing(function (\Livewire\Features\SupportFileUploads\TemporaryUploadedFile $file): string {
+                                $result = cloudinary()->upload($file->getRealPath(), [
+                                    'folder' => 'polaroid_audio',
+                                    'resource_type' => 'video', // Audio must be uploaded as 'video' in Cloudinary
+                                ]);
+                                return $result->getSecurePath();
+                            })
                             ->columnSpanFull(),
                     ]),
 
