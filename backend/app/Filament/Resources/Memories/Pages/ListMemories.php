@@ -111,7 +111,7 @@ class ListMemories extends ListRecords
                                     $resData = $responseCloud->json();
                                     $cloudinaryUrl = $resData['public_id'] . '.' . $resData['format'];
                                 } else {
-                                    \Illuminate\Support\Facades\Log::error("Cloudinary Upload Error: " . $responseCloud->body());
+                                    throw new \Exception("Cloudinary Upload Error: " . $responseCloud->body());
                                 }
                             }
                         }
@@ -258,7 +258,7 @@ class ListMemories extends ListRecords
                                     $resData = $responseCloud->json();
                                     $cloudinaryUrl = $resData['public_id'] . '.' . $resData['format'];
                                 } else {
-                                    \Illuminate\Support\Facades\Log::error("Cloudinary Error: " . $responseCloud->body());
+                                    throw new \Exception("Cloudinary Upload Error: " . $responseCloud->body());
                                 }
                             }
                         }
