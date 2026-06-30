@@ -30,11 +30,15 @@ class MemoriesTable
                         if (str_starts_with($record->image_path, 'http')) {
                             return $record->image_path;
                         }
-                        try {
-                            return \Illuminate\Support\Facades\Storage::disk('cloudinary')->url($record->image_path);
-                        } catch (\Exception $e) {
-                            return asset('storage/' . $record->image_path);
+                        $cloudConfig = env('CLOUDINARY_URL');
+                        if ($cloudConfig) {
+                            $parsed = parse_url($cloudConfig);
+                            $cloudName = $parsed['host'] ?? '';
+                            if ($cloudName) {
+                                return "https://res.cloudinary.com/{$cloudName}/image/upload/" . ltrim($record->image_path, '/');
+                            }
                         }
+                        return asset('storage/' . $record->image_path);
                     }),
                 TextColumn::make('date')
                     ->label('Fecha')

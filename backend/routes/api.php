@@ -14,9 +14,16 @@ Route::middleware(['throttle:60,1'])->group(function () {
                 if (str_starts_with($memory->image_path, 'http')) {
                     $data['image_url'] = $memory->image_path;
                 } else {
-                    try {
-                        $data['image_url'] = \Illuminate\Support\Facades\Storage::disk('cloudinary')->url($memory->image_path);
-                    } catch (\Exception $e) {
+                    $cloudConfig = env('CLOUDINARY_URL');
+                    if ($cloudConfig) {
+                        $parsed = parse_url($cloudConfig);
+                        $cloudName = $parsed['host'] ?? '';
+                        if ($cloudName) {
+                            $data['image_url'] = "https://res.cloudinary.com/{$cloudName}/image/upload/" . ltrim($memory->image_path, '/');
+                        } else {
+                            $data['image_url'] = asset('storage/' . $memory->image_path);
+                        }
+                    } else {
                         $data['image_url'] = asset('storage/' . $memory->image_path);
                     }
                 }
