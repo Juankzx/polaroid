@@ -62,6 +62,11 @@ class ListMemories extends ListRecords
                 ->action(function (array $data) {
                     $contador = 1;
                     foreach ($data['fotos'] as $tempPath) {
+                        // LOG DIAGNÓSTICO - ver en Railway > Logs
+                        \Illuminate\Support\Facades\Log::info("=== EXIF DEBUG QuickBulk ===");
+                        \Illuminate\Support\Facades\Log::info("Raw tempPath: " . $tempPath);
+                        \Illuminate\Support\Facades\Log::info("EXIF extension loaded: " . (function_exists('exif_read_data') ? 'YES' : 'NO'));
+
                         // Intentar múltiples paths posibles para el archivo temporal
                         $possiblePaths = [
                             storage_path('app/public/' . $tempPath),
@@ -71,6 +76,7 @@ class ListMemories extends ListRecords
 
                         $fullPath = null;
                         foreach ($possiblePaths as $p) {
+                            \Illuminate\Support\Facades\Log::info("Checking path: " . $p . " - exists: " . (file_exists($p) ? 'YES' : 'NO'));
                             if (file_exists($p)) {
                                 $fullPath = $p;
                                 break;
@@ -80,6 +86,9 @@ class ListMemories extends ListRecords
                         // Usar el primer path aunque no exista (fallback)
                         if (!$fullPath) {
                             $fullPath = storage_path('app/public/' . $tempPath);
+                            \Illuminate\Support\Facades\Log::warning("No path found! Falling back to: " . $fullPath);
+                        } else {
+                            \Illuminate\Support\Facades\Log::info("File FOUND at: " . $fullPath);
                         }
 
                         $fecha = isset($data['fecha_fallback']) && $data['fecha_fallback']
