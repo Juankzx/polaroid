@@ -110,6 +110,8 @@ class ListMemories extends ListRecords
                                 if ($responseCloud->successful()) {
                                     $resData = $responseCloud->json();
                                     $cloudinaryUrl = $resData['public_id'] . '.' . $resData['format'];
+                                } else {
+                                    \Illuminate\Support\Facades\Log::error("Cloudinary Upload Error: " . $responseCloud->body());
                                 }
                             }
                         }
