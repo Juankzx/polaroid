@@ -57,11 +57,17 @@ class SiteSettingForm
                             ->acceptedFileTypes(['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-m4a'])
                             ->maxSize(10240) // 10 MB
                             ->saveUploadedFileUsing(function (\Livewire\Features\SupportFileUploads\TemporaryUploadedFile $file): string {
-                                $result = cloudinary()->upload($file->getRealPath(), [
-                                    'folder' => 'polaroid_audio',
-                                    'resource_type' => 'video', // Audio must be uploaded as 'video' in Cloudinary
-                                ]);
-                                return $result->getSecurePath();
+                                try {
+                                    $result = cloudinary()->upload($file->getRealPath(), [
+                                        'folder' => 'polaroid_audio',
+                                        'resource_type' => 'video', // Audio must be uploaded as 'video' in Cloudinary
+                                    ]);
+                                    return $result->getSecurePath();
+                                } catch (\Exception $e) {
+                                    throw \Illuminate\Validation\ValidationException::withMessages([
+                                        'custom_audio_path' => 'Cloudinary Error: ' . $e->getMessage()
+                                    ]);
+                                }
                             })
                             ->columnSpanFull(),
                     ]),
