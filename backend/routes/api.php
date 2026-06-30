@@ -40,6 +40,18 @@ Route::middleware(['throttle:60,1'])->group(function () {
         return $data;
     });
 
+    Route::get('/test-cloudinary', function () {
+        try {
+            $config = config('cloudinary.cloud_url');
+            if (!$config) {
+                return 'Error: CLOUDINARY_URL is missing or empty on Railway.';
+            }
+            return 'Cloudinary URL is set to: ' . substr($config, 0, 15) . '... (truncated for security). Please check if it is correct.';
+        } catch (\Exception $e) {
+            return 'Cloudinary Error: ' . $e->getMessage();
+        }
+    });
+
     Route::get('/debug-logs', function () {
         $logPath = storage_path('logs/laravel.log');
         if (!file_exists($logPath)) {
